@@ -1,0 +1,65 @@
+`include "constants.h"
+`include "disciplines.h"
+`define DEBUG if (1) $strobe
+
+module empyreanolediv(anode,cathode);
+
+    parameter real T = 27 from [-inf:inf];    	
+    parameter real area = 2.0e-6 from (0:inf];	
+    parameter real l = 2e-3 from (0:inf];    
+    parameter real Vo = 1.0329 from [-inf:inf];             
+    parameter real Vbi = 0.2977 from [-inf:inf];
+    parameter real Reconst = 4.1291e-05 from [-inf:inf];            
+    parameter real Rpconst = 3.5000e+05 from [-inf:inf];                 
+    parameter real Rbiconst = 25.9756 from [-inf:inf];	
+    parameter real Rsconst = 1.2973 from [-inf:inf];
+	parameter real Thick = 1.05e-7 from (0:inf];
+    parameter real slope_factor_for_vbi = 0.0326 from (0:inf]; 
+	parameter real slope_factor_for_vo1 = 0.0260 from (0:inf] ;
+	parameter real slope_factor_for_vo2 = 0.0260 from (0:inf] ;
+
+    inout anode,cathode;   
+    electrical anode;           //P(info="external anode node");
+    electrical cathode;        //P(info="external cathode node");
+
+    real Re,Rp,Rbi,Rs;
+    real sigmoid_from_vbi, sigmoid_from_vo1,sigmoid_from_vo2;
+    real Rbi_valid,Rs_valid,Rp_valid;
+    real Va;
+
+    analog begin
+        Va = V(anode,cathode);        
+
+         //Electrode resistance
+         Re = Reconst*Thick/area;
+        
+         //Resistance second
+         Rp = Rpconst*Thick/area;
+        
+         //Built-in resistance
+         Rbi = Rbiconst*Thick/area;
+        
+        //Resistance second
+         Rs = Rsconst*Thick/area;
+
+        //
+        sigmoid_from_vbi = 1/(1+exp((Vbi-Va)/slope_factor_for_vbi));
+
+        //
+        sigmoid_from_vo1 = 1/(1+exp((Vo-Va)/slope_factor_for_vo1));
+
+        //
+        sigmoid_from_vo2 = 1/(1+exp((Vo-Va)/slope_factor_for_vo2));
+
+        //
+        Rbi_valid = 1/Rbi * sigmoid_from_vbi;
+
+        //
+        Rs_valid = 1/Rs * sigmoid_from_vo1;
+        
+        //
+        Rp_valid = 1/Rp * sigmoid_from_vo2;
+
+I(anode,cathode) <+ Va/((Va*Rp_valid - (Vbi-Va) * Rbi_valid - (Vo-Va) * Rs_valid) / ((Rbi_valid + Rs_valid + Rp_valid + Re)/Re));
+end
+endmodule

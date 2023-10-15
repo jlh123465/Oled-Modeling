@@ -1,0 +1,81 @@
+`include "constants.h"
+`include "disciplines.h"
+`define DEBUG if (1) $strobe
+
+module empyreanoledcv(anode,cathode);
+
+    parameter real T = 27 from [-inf:inf];    	
+    parameter real Area = 2.0e-6 from (0:inf];	
+    parameter real l = 2e-3 from (0:inf];
+    parameter real Vo = 1.0329 from [-inf:inf];             
+    parameter real Vbi = 0.2977 from [-inf:inf];
+     parameter real Reconst = 4.1291e-05 from [-inf:inf];            
+    parameter real Rpconst = 3.5000e+05 from [-inf:inf];                 
+    parameter real Rbiconst = 25.9756 from [-inf:inf];	
+    parameter real Rsconst = 1.2973 from [-inf:inf];
+    parameter real Cgconst = 6.51e-10 from [-inf:inf]; 
+    parameter real Cdconst = 6.51e-10 from [-inf:inf];  
+	parameter real Thick = 1.05e-7 from (0:inf];
+    parameter real slope_factor_for_vbi = 0.0326 from (0:inf]; 
+	parameter real slope_factor_for_vo1 = 0.0260 from (0:inf] ;
+	parameter real slope_factor_for_vo2 = 0.0260 from (0:inf] ;
+    parameter real w = 628.31852e+3 from (0:inf];
+    parameter real A =1 from (0:inf];
+
+    inout anode,cathode;   
+    electrical anode;           //P(info="external anode node");
+    electrical cathode;        //P(info="external cathode node");
+    electrical internal;
+
+    real Cd,Cg;
+    real Re,Rp,Rbi,Rs;
+    real V1;
+    real sigmoid_from_vbi, sigmoid_from_vo1,sigmoid_from_vo2;
+    real Rbi_valid,Rs_valid,Rp_valid;
+    real Va;
+    real cc;
+
+    analog begin
+        Va = V(anode,cathode);
+
+        // Diffusion capacitance
+        Cd = Cdconst*A; 
+
+        //Geometric capacitance
+        Cg = Cgconst*Area/Thick;   
+        
+         //Electrode resistance
+         Re = Reconst*Thick/Area;
+        
+         //Resistance second
+         Rp = Rpconst*Thick/Area;
+        
+         //Built-in resistance
+         Rbi = Rbiconst*Thick/Area;
+        
+        //Resistance second
+         Rs = Rsconst*Thick/Area;
+
+        //
+        sigmoid_from_vbi = 1/(1+exp((Vbi-Va)/slope_factor_for_vbi));
+
+        //
+        sigmoid_from_vo1 = 1/(1+exp((Vo-Va)/slope_factor_for_vo1));
+        
+        //
+        sigmoid_from_vo2 = 1/(1+exp((Vo-Va)/slope_factor_for_vo2));
+
+        //
+        Rbi_valid = Rbi * sigmoid_from_vbi;
+        
+        //
+        Rs_valid = Rs * sigmoid_from_vo1;
+
+        //
+        Rp_valid = Rp * sigmoid_from_vo2;
+        //
+        cc = - Cg/(w*(exp(Va - Vbi) + 1)) - (Rbi*Va*(Cd*Rbi*V1*w + Cg*Rbi*V1*w - Cd*Rbi*Vbi*w))/((pow((Cd*Rbi*V1*w + Cg*Rbi*V1*w - Cd*Rbi*Vbi*w),2) + pow((V1 - Vbi),2))*(exp(Vbi - Va) + 1)*(exp(Va - Vo) + 1)) - (Rbi*Rp*Rs*Va*(Cd*V1*w + Cg*V1*w - Cd*Vbi*w)*pow((Rbi*Rp*V1 + Rbi*Rs*V1 + Rp*Rs*V1 - Rbi*Rp*Vo - Rp*Rs*Vbi),2))/(exp(Vo - Va) + 1);
+        V(internal) <+ ddt(V(anode,cathode));
+        I( anode,cathode) <+ cc*V(internal);
+end
+endmodule
